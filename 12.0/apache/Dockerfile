@@ -1,5 +1,4 @@
-# DO NOT EDIT: created by update.sh from Dockerfile-debian.template
-FROM php:7.1-apache-stretch
+FROM php:7.1-apache
 
 # entrypoint.sh and cron.sh dependencies
 RUN set -ex; \
@@ -43,18 +42,21 @@ RUN set -ex; \
         gd \
         intl \
         ldap \
+        mbstring \
+        mcrypt \
+        mysqli \
         opcache \
         pcntl \
         pdo_mysql \
         pdo_pgsql \
+        pgsql \
         zip \
     ; \
-    \
-# pecl will claim success even if one install fails, so we need to perform each install separately
-    pecl install APCu-5.1.12; \
-    pecl install memcached-3.0.4; \
-    pecl install redis-4.1.1; \
-    \
+    pecl install \
+        APCu-5.1.11 \
+        memcached-3.0.4 \
+        redis-3.1.6 \
+    ; \
     docker-php-ext-enable \
         apcu \
         memcached \
@@ -89,8 +91,6 @@ RUN { \
     \
     echo 'apc.enable_cli=1' >> /usr/local/etc/php/conf.d/docker-php-ext-apcu.ini; \
     \
-    echo 'memory_limit=512M' > /usr/local/etc/php/conf.d/memory-limit.ini; \
-    \
     mkdir /var/www/data; \
     chown -R www-data:root /var/www; \
     chmod -R g=u /var/www
@@ -106,34 +106,22 @@ RUN a2enmod rewrite remoteip ;\
     } > /etc/apache2/conf-available/remoteip.conf;\
     a2enconf remoteip
 
-ENV NEXTCLOUD_VERSION 12.0.11
+ENV NEXTCLOUD_VERSION 12.0.6
 
+COPY nextcloud.tar.gz /tmp/nextcloud.tar.gz
 RUN set -ex; \
-    fetchDeps=" \
-        gnupg \
-        dirmngr \
-    "; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends $fetchDeps; \
-    \
-    curl -fsSL -o nextcloud.tar.bz2 \
-        "https://download.nextcloud.com/server/releases/nextcloud-${NEXTCLOUD_VERSION}.tar.bz2"; \
-    curl -fsSL -o nextcloud.tar.bz2.asc \
-        "https://download.nextcloud.com/server/releases/nextcloud-${NEXTCLOUD_VERSION}.tar.bz2.asc"; \
-    export GNUPGHOME="$(mktemp -d)"; \
-# gpg key from https://nextcloud.com/nextcloud.asc
-    gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 28806A878AE423A28372792ED75899B9A724937A; \
-    gpg --batch --verify nextcloud.tar.bz2.asc nextcloud.tar.bz2; \
-    tar -xjf nextcloud.tar.bz2 -C /usr/src/; \
-    gpgconf --kill all; \
-    rm -r "$GNUPGHOME" nextcloud.tar.bz2.asc nextcloud.tar.bz2; \
+    tar -xf /tmp/nextcloud.tar.gz -C /usr/src/; \
     rm -rf /usr/src/nextcloud/updater; \
     mkdir -p /usr/src/nextcloud/data; \
     mkdir -p /usr/src/nextcloud/custom_apps; \
-    chmod +x /usr/src/nextcloud/occ; \
-    \
-    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $fetchDeps; \
-    rm -rf /var/lib/apt/lists/*
+    chmod +x /usr/src/nextcloud/occ
+COPY logout.php /usr/src/nextcloud/
+
+# user_saml
+COPY nextcloud-user_saml.tar.gz /tmp/nextcloud-user_saml.tar.gz
+RUN set -ex; \
+    tar -xf /tmp/nextcloud-user_saml.tar.gz -C /usr/src/nextcloud/custom_apps; \
+    mv /usr/src/nextcloud/custom_apps/nextcloud-user_saml /usr/src/nextcloud/custom_apps/user_saml
 
 COPY *.sh upgrade.exclude /
 COPY config/* /usr/src/nextcloud/config/
