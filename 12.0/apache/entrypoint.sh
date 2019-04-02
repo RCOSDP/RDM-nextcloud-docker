@@ -88,7 +88,7 @@ if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ]; then
                     install_options=$install_options' --database pgsql --database-name "$POSTGRES_DB" --database-user "$POSTGRES_USER" --database-pass "$POSTGRES_PASSWORD" --database-host "$POSTGRES_HOST"'
                     install=true
                 fi
-                
+
                 if [ "$install" = true ]; then
                     echo "starting nexcloud installation"
                     max_retries=10
@@ -119,5 +119,8 @@ if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ]; then
         fi
     fi
 fi
+
+# Start crond
+busybox crond -l 0 -L /dev/stdout
 
 exec "$@"
